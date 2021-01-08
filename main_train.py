@@ -1,4 +1,6 @@
 from config import get_arguments
+import os
+os.environ['KMP_DUPLICATE_LIB_OK']='True'
 from SinGAN.manipulate import *
 from SinGAN.training import *
 import SinGAN.functions as functions
