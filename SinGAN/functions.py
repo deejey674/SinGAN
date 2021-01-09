@@ -271,6 +271,8 @@ def generate_dir2save(opt):
         dir2save = '%s/SR/%s' % (opt.out, opt.sr_factor)
     elif opt.mode == 'harmonization':
         dir2save = '%s/Harmonization/%s/%s_out' % (opt.out, opt.input_name[:-4],opt.ref_name[:-4])
+    elif opt.mode == 'inpainting':
+        dir2save = '%s/Inpainting/%s/%s_out' % (opt.out, opt.input_name[:-4], opt.ref_name[:-4])
     elif opt.mode == 'editing':
         dir2save = '%s/Editing/%s/%s_out' % (opt.out, opt.input_name[:-4],opt.ref_name[:-4])
     elif opt.mode == 'paint2image':
@@ -337,6 +339,8 @@ def quant2centers(paint, centers):
 
 def dilate_mask(mask,opt):
     if opt.mode == "harmonization":
+        element = morphology.disk(radius=7)
+    if opt.mode == "inpainting":
         element = morphology.disk(radius=7)
     if opt.mode == "editing":
         element = morphology.disk(radius=20)
