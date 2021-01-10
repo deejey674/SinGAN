@@ -1,6 +1,8 @@
 import SinGAN.functions as functions
 import SinGAN.models as models
 import os
+import cv2
+from skimage import io as img
 import torch.nn as nn
 import torch.optim as optim
 import torch.utils.data
@@ -15,6 +17,17 @@ def train(opt,Gs,Zs,reals,NoiseAmp):
     real = imresize(real_,opt.scale1,opt)
     reals = functions.creat_reals_pyramid(real,reals,opt)
     nfc_prev = 0
+    #creating a pyramid of masks the same way we did for the img and thus to train on only the correct pixels
+    #at all scales
+    if opt.inpainting: #np2torch function code
+        m = functions.read_image_dir('%s/%s_mask%s' % (opt.ref_dir, opt.input_name[:-4], opt.input_name[-4:]), opt)
+        #m = img.imread('%s/%s_mask%s' % (opt.ref_dir, opt.input_name[:-4], opt.input_name[-4:])) # img.imread
+        #m = m[:, :, :, None]
+        #m = m.permute((3, 2, 0, 1))
+        #m = torch.from_numpy(m)  # tensor
+        m=imresize(m,opt.scale1,opt)
+        m_s=[] #pyramid of masks
+        opt.m_s=functions.creat_reals_pyramid(m,m_s,opt)
 
     while scale_num<opt.stop_scale+1:
         opt.nfc = min(opt.nfc_init * pow(2, math.floor(scale_num / 4)), 128)
@@ -108,8 +121,10 @@ def train_single_scale(netD,netG,reals,Gs,Zs,in_s,NoiseAmp,opt,centers=None):
         for j in range(opt.Dsteps):
             # train with real
             netD.zero_grad()
-
-            output = netD(real).to(opt.device)
+            if opt.inpainting:
+                output=netD( (1-opt.m_s[len(Gs)])*real).to(opt.device)
+            else:
+                output = netD(real).to(opt.device)
             #D_real_map = output.detach()
             errD_real = -output.mean()#-a
             errD_real.backward(retain_graph=True)
@@ -136,7 +151,7 @@ def train_single_scale(netD,netG,reals,Gs,Zs,in_s,NoiseAmp,opt,centers=None):
                     prev = m_image(prev)
                     z_prev = draw_concat(Gs,Zs,reals,NoiseAmp,in_s,'rec',m_noise,m_image,opt)
                     criterion = nn.MSELoss()
-                    RMSE = torch.sqrt(criterion(real, z_prev))
+                    RMSE = torch.sqrt(criterion(real, z_prev)) #(1-opt.m_s[len(Gs)])*real
                     opt.noise_amp = opt.noise_amp_init*RMSE
                     z_prev = m_image(z_prev)
             else:
@@ -153,12 +168,17 @@ def train_single_scale(netD,netG,reals,Gs,Zs,in_s,NoiseAmp,opt,centers=None):
                 noise = opt.noise_amp*noise_+prev
 
             fake = netG(noise.detach(),prev)
-            output = netD(fake.detach())
+            if opt.inpainting:
+                output = netD((1-opt.m_s[len(Gs)])*fake.detach())
+            else:
+                output = netD(fake.detach())
             errD_fake = output.mean()
             errD_fake.backward(retain_graph=True)
             D_G_z = output.mean().item()
-
-            gradient_penalty = functions.calc_gradient_penalty(netD, real, fake, opt.lambda_grad, opt.device)
+            if opt.inpainting:
+                gradient_penalty = functions.calc_gradient_penalty(netD, (1-opt.m_s[len(Gs)])*real, (1-opt.m_s[len(Gs)])*fake, opt.lambda_grad, opt.device, 1-opt.m_s[len(Gs)])
+            else:
+                gradient_penalty = functions.calc_gradient_penalty(netD, real, fake, opt.lambda_grad, opt.device)
             gradient_penalty.backward()
 
             errD = errD_real + errD_fake + gradient_penalty
@@ -172,7 +192,10 @@ def train_single_scale(netD,netG,reals,Gs,Zs,in_s,NoiseAmp,opt,centers=None):
 
         for j in range(opt.Gsteps):
             netG.zero_grad()
-            output = netD(fake)
+            if opt.inpainting:
+                output = netD((1-opt.m_s[len(Gs)])*fake)
+            else:
+                output=netD(fake)
             #D_fake_map = output.detach()
             errG = -output.mean()
             errG.backward(retain_graph=True)
@@ -182,6 +205,8 @@ def train_single_scale(netD,netG,reals,Gs,Zs,in_s,NoiseAmp,opt,centers=None):
                     z_prev = functions.quant2centers(z_prev, centers)
                     plt.imsave('%s/z_prev.png' % (opt.outf), functions.convert_image_np(z_prev), vmin=0, vmax=1)
                 Z_opt = opt.noise_amp*z_opt+z_prev
+                if opt.inpainting:
+                    rec_loss = alpha*loss((1-opt.m_s[len(Gs)]) * netG(Z_opt.detach(), z_prev), (1-opt.m_s[len(Gs)])*real)
                 rec_loss = alpha*loss(netG(Z_opt.detach(),z_prev),real)
                 rec_loss.backward(retain_graph=True)
                 rec_loss = rec_loss.detach()

@@ -11,6 +11,8 @@ if __name__ == '__main__':
     parser.add_argument('--input_dir', help='input image dir', default='Input/Images')
     parser.add_argument('--input_name', help='input image name', required=True)
     parser.add_argument('--mode', help='task to be done', default='train')
+    parser.add_argument('--inpainting', help = 'training with a damaged img for inpainting use', action = 'store_true',)
+    parser.add_argument('--ref_dir', help='input reference dir', default='Input/Inpainting')
     opt = parser.parse_args()
     opt = functions.post_config(opt)
     Gs = []
