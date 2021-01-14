@@ -124,7 +124,7 @@ def move_to_cpu(t):
     t = t.to(torch.device('cpu'))
     return t
 
-def calc_gradient_penalty(netD, real_data, fake_data, LAMBDA, device,mask=None):
+def calc_gradient_penalty(netD, real_data, fake_data, LAMBDA, device,m=None):
     #print real_data.size()
     alpha = torch.rand(1, 1)
     alpha = alpha.expand(real_data.size())
@@ -135,8 +135,8 @@ def calc_gradient_penalty(netD, real_data, fake_data, LAMBDA, device,mask=None):
 
     interpolates = interpolates.to(device)#.cuda()
     interpolates = torch.autograd.Variable(interpolates, requires_grad=True)
-    if mask is not None:
-        interpolates=mask*interpolates
+    if m is not None:
+        interpolates=m*interpolates
     disc_interpolates = netD(interpolates)
 
     gradients = torch.autograd.grad(outputs=disc_interpolates, inputs=interpolates,

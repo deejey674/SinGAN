@@ -1,7 +1,6 @@
 import SinGAN.functions as functions
 import SinGAN.models as models
 import os
-import cv2
 from skimage import io as img
 import torch.nn as nn
 import torch.optim as optim
@@ -19,12 +18,8 @@ def train(opt,Gs,Zs,reals,NoiseAmp):
     nfc_prev = 0
     #creating a pyramid of masks the same way we did for the img and thus to train on only the correct pixels
     #at all scales
-    if opt.inpainting: #np2torch function code
+    if opt.inpainting:
         m = functions.read_image_dir('%s/%s_mask%s' % (opt.ref_dir, opt.input_name[:-4], opt.input_name[-4:]), opt)
-        #m = img.imread('%s/%s_mask%s' % (opt.ref_dir, opt.input_name[:-4], opt.input_name[-4:])) # img.imread
-        #m = m[:, :, :, None]
-        #m = m.permute((3, 2, 0, 1))
-        #m = torch.from_numpy(m)  # tensor
         m=imresize(m,opt.scale1,opt)
         m_s=[] #pyramid of masks
         opt.m_s=functions.creat_reals_pyramid(m,m_s,opt)
@@ -121,6 +116,7 @@ def train_single_scale(netD,netG,reals,Gs,Zs,in_s,NoiseAmp,opt,centers=None):
         for j in range(opt.Dsteps):
             # train with real
             netD.zero_grad()
+            #real=(1-opt.m_s[len(Gs)])*real
             if opt.inpainting:
                 output=netD( (1-opt.m_s[len(Gs)])*real).to(opt.device)
             else:
